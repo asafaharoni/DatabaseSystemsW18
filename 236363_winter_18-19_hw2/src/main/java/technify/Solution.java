@@ -1,130 +1,845 @@
 package technify;
 
-import technify.business.*;
-
-import static technify.business.ReturnValue.*;
-
-import technify.data.DBConnector;
-import technify.data.PostgreSQLErrorCodes;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import technify.business.Playlist;
+import technify.business.ReturnValue;
+import technify.business.Song;
+import technify.business.User;
+import technify.data.DBConnector;
+import technify.data.PostgreSQLErrorCodes;
+
 
 public class Solution {
 
-    public static void createTables() {
+    // TABLE NAMES
+    private static final String SONG_TABLE_NAME = "Songs ";
+    private static final String USERS_TABLE_NAME = "Users ";
+    private static final String PLAYLISTS_TABLE_NAME = "Playlists ";
+    private static final String INCLUDES_TABLE_NAME = "Includes ";
+    private static final String FOLLOWS_TABLE_NAME = "Follows ";
+    // COMMANDS
+    private static final String CREATE = "CREATE TABLE ";
+    private static final String SELECT_ALL_FIELDS = "SELECT * ";
+    private static final String SELECT = "SELECT ";
 
+
+    public static void createTables()
+    {
+        Connection connection = DBConnector.getConnection();
+        PreparedStatement pstmt = null;
+        try{
+            pstmt = connection.prepareStatement(CREATE + SONG_TABLE_NAME +
+                    "(\n" +
+                    "    id integer,\n" +
+                    "    name text NOT NULL,\n" +
+                    "    genre text NOT NULL,\n" +
+                    "    country text,\n" +
+                    "    playCount integer DEFAULT 0,\n" +
+                    "    PRIMARY KEY (id),\n" +
+                    "    CHECK (id > 0),\n" +
+                    "    CHECK (playCount >= 0)\n" +
+                    ");");
+            pstmt.execute();
+            pstmt = connection.prepareStatement(CREATE + USERS_TABLE_NAME +
+                    "(\n" +
+                    "    id integer,\n" +
+                    "    name text NOT NULL,\n" +
+                    "    country text NOT NULL,\n" +
+                    "    premium boolean NOT NULL,\n" +
+                    "    PRIMARY KEY (id),\n" +
+                    "    CHECK (id > 0)\n" +
+                    ");");
+            pstmt.execute();
+            pstmt = connection.prepareStatement(CREATE + PLAYLISTS_TABLE_NAME +
+                    "(\n" +
+                    "    id integer,\n" +
+                    "    genre text NOT NULL," +
+                    "    description text NOT NULL," +
+                    "    PRIMARY KEY (id),\n" +
+                    "    CHECK (id > 0)\n" +
+                    ")");
+            pstmt.execute();
+            pstmt = connection.prepareStatement(CREATE + INCLUDES_TABLE_NAME +
+                    "(\n" +
+                    "    sid integer NOT NULL,\n" +
+                    "    pid integer NOT NULL ,\n" +
+                    "    CONSTRAINT song_exists FOREIGN KEY (sid) REFERENCES " + SONG_TABLE_NAME + "(id) ON DELETE CASCADE,\n" +
+                    "    CONSTRAINT playlist_exists FOREIGN KEY (pid) REFERENCES " + PLAYLISTS_TABLE_NAME + "(id) ON DELETE CASCADE,\n" +
+//                    "    CHECK " + SONG_TABLE_NAME + "(id) == " + PLAYLISTS_TABLE_NAME + "(id)," + //TODO: NOT WORKING
+                    "    PRIMARY KEY (sid,pid)" +
+                    ")");
+            pstmt.execute();
+            pstmt = connection.prepareStatement(CREATE + FOLLOWS_TABLE_NAME +
+                    "(\n" +
+                    "    uid integer NOT NULL,\n" +
+                    "    pid integer NOT NULL ,\n" +
+                    "    CONSTRAINT user_exists FOREIGN KEY (uid) REFERENCES " + USERS_TABLE_NAME + "(id) ON DELETE CASCADE,\n" +
+                    "    CONSTRAINT playlist_exists FOREIGN KEY (pid) REFERENCES " + PLAYLISTS_TABLE_NAME + "(id) ON DELETE CASCADE,\n" +
+                    "    PRIMARY KEY (uid,pid)" +
+                    ")");
+            pstmt.execute();
+            //TODO: check if DELETE ON CASCADE works
+        } catch (SQLException var15) {
+            System.out.println("error in createTables: " + var15);
+            //e.printStackTrace()();
+        }
+        finally {
+            try {
+                pstmt.close();
+            } catch (SQLException var14) {
+                System.out.println("error in createTables(finally,pstmt): " + var14);
+                //e.printStackTrace()();
+            }
+            try {
+                connection.close();
+            } catch (SQLException var13) {
+                System.out.println("error in createTables(finally,connection): " + var13);
+                //e.printStackTrace()();
+            }
+        }
     }
-
 
     public static void clearTables()
     {
-
+        Connection connection = DBConnector.getConnection();
+        PreparedStatement pstmt = null;
+        try {
+            pstmt = connection.prepareStatement("DELETE FROM " + SONG_TABLE_NAME);
+            pstmt.execute();
+            pstmt = connection.prepareStatement("DELETE FROM " + USERS_TABLE_NAME);
+            pstmt.execute();
+            pstmt = connection.prepareStatement("DELETE FROM " + PLAYLISTS_TABLE_NAME);
+            pstmt.execute();
+            pstmt = connection.prepareStatement("DELETE FROM " + INCLUDES_TABLE_NAME);
+            pstmt.execute();
+            pstmt = connection.prepareStatement("DELETE FROM " + FOLLOWS_TABLE_NAME);
+            pstmt.execute();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        finally {
+            try {
+                pstmt.close();
+            } catch (SQLException e) {
+                //e.printStackTrace()();
+            }
+            try {
+                connection.close();
+            } catch (SQLException e) {
+            }
+        }
     }
-
 
     public static void dropTables()
     {
+        Connection connection = DBConnector.getConnection();
+        PreparedStatement pstmt = null;
+        try {
+            pstmt = connection.prepareStatement("DROP TABLE IF EXISTS " + SONG_TABLE_NAME + "CASCADE");
+            pstmt.execute();
+            pstmt = connection.prepareStatement("DROP TABLE IF EXISTS " + USERS_TABLE_NAME + "CASCADE");
+            pstmt.execute();
+            pstmt = connection.prepareStatement("DROP TABLE IF EXISTS " + PLAYLISTS_TABLE_NAME + "CASCADE");
+            pstmt.execute();
+            pstmt = connection.prepareStatement("DROP TABLE IF EXISTS " + INCLUDES_TABLE_NAME + "CASCADE");
+            pstmt.execute();
+            pstmt = connection.prepareStatement("DROP TABLE IF EXISTS " + FOLLOWS_TABLE_NAME + "CASCADE");
+            pstmt.execute();
+        } catch (SQLException e) {
+            //e.printStackTrace()();
+        }
+        finally {
+            try {
+                pstmt.close();
+            } catch (SQLException e) {
+                //e.printStackTrace()();
+            }
+            try {
+                connection.close();
+            } catch (SQLException e) {
 
+            }
+        }
     }
-
 
     public static ReturnValue addUser(User user)
     {
+        Connection connection = DBConnector.getConnection();
+        PreparedStatement pstmt = null;
+        try {
+            pstmt = connection.prepareStatement("INSERT INTO " + USERS_TABLE_NAME +
+                    " VALUES (?, ?, ?, ?)");
+            pstmt.setInt(1, user.getId());
+            pstmt.setString(2, user.getName());
+            pstmt.setString(3, user.getCountry());
+            pstmt.setBoolean(4, user.getPremium());
 
-        return null;
-
+            pstmt.execute();
+        } catch (SQLException e) {
+            return sqlExceptionToReturnValue(e);
+        }
+        finally {
+            try {
+                pstmt.close();
+            } catch (SQLException e) {
+                return ReturnValue.ERROR;
+            }
+            try {
+                connection.close();
+            } catch (SQLException e) {
+                return ReturnValue.ERROR;
+            }
+        }
+        return ReturnValue.OK;
     }
 
     public static User getUserProfile(Integer userId)
     {
+        User user = new User();
+        Connection connection = DBConnector.getConnection();
+        PreparedStatement pstmt = null;
+        try {
+            pstmt = connection.prepareStatement(SELECT_ALL_FIELDS +
+                    "FROM " + USERS_TABLE_NAME + " " +
+                    "WHERE id = (?)");
+            pstmt.setInt(1, userId);
 
-        return null;
+            ResultSet res = pstmt.executeQuery();
+
+            if (res.next()) {
+                user.setId(res.getInt(1));
+                user.setName(res.getString(2));
+                user.setCountry(res.getString(3));
+                user.setPremium(res.getBoolean(4));
+            } else {
+                user = User.badUser();
+            }
+            res.close();
+        } catch (SQLException e) {
+            return User.badUser();
+        }
+        finally {
+            try {
+                pstmt.close();
+            } catch (SQLException e) {
+                return User.badUser();
+            }
+            try {
+                connection.close();
+            } catch (SQLException e) {
+                return User.badUser();
+            }
+        }
+        return user;
     }
 
     public static ReturnValue deleteUser(User user)
     {
-        return null;
+        Connection connection = DBConnector.getConnection();
+        PreparedStatement pstmt = null;
+        try {
+            pstmt = connection.prepareStatement("DELETE FROM " + USERS_TABLE_NAME + //", " + FOLLOWS_TABLE_NAME +
+                    " WHERE id=?");
+            pstmt.setInt(1, user.getId());
+            int count = pstmt.executeUpdate();
+            if (count == 0) {
+                return ReturnValue.NOT_EXISTS;
+            }
+        } catch (SQLException e) {
+            return sqlExceptionToReturnValue(e);
+        }
+        finally {
+            try {
+                pstmt.close();
+            } catch (SQLException e) {
+                return ReturnValue.ERROR;
+            }
+            try {
+                connection.close();
+            } catch (SQLException e) {
+                return ReturnValue.ERROR;
+            }
+        }
+        return ReturnValue.OK;
     }
 
     public static ReturnValue updateUserPremium(Integer userId)
     {
-        return null;
+        Connection connection = DBConnector.getConnection();
+        PreparedStatement pstmt = null;
+        try {
+            pstmt = connection.prepareStatement(
+                    "UPDATE " + USERS_TABLE_NAME +
+                            "SET premium=?\n" +
+                            "WHERE id=(?)");
+            pstmt.setBoolean(1, true);
+            pstmt.setInt(2, userId);
+            int count = pstmt.executeUpdate();
+            if (count == 0) {
+                return ReturnValue.NOT_EXISTS;
+            }
+        } catch (SQLException e) {
+            return sqlExceptionToReturnValue(e);
+        }
+        finally {
+            try {
+                pstmt.close();
+            } catch (SQLException e) {
+                return ReturnValue.ERROR;
+            }
+            try {
+                connection.close();
+            } catch (SQLException e) {
+                return ReturnValue.ERROR;
+            }
+        }
+        return ReturnValue.OK;
     }
 
     public static ReturnValue updateUserNotPremium(Integer userId)
     {
-        return null;
+        User user = getUserProfile(userId);
+        if (!user.equals(User.badUser()) && !user.getPremium()) {
+            return ReturnValue.ALREADY_EXISTS; //TODO: CHECK IF CORRECT!! MAYBE NEED TO USE QUERY
+        }
+        Connection connection = DBConnector.getConnection();
+        PreparedStatement pstmt = null;
+        try {
+            pstmt = connection.prepareStatement(
+                    "UPDATE " + USERS_TABLE_NAME +
+                            "SET premium=?\n" +
+                            "WHERE id=?");
+            pstmt.setBoolean(1, false);
+            pstmt.setInt(2, userId);
+            int count = pstmt.executeUpdate();
+            if (count == 0) {
+                return ReturnValue.NOT_EXISTS;
+            }
+        } catch (SQLException e) {
+            return sqlExceptionToReturnValue(e);
+        }
+        finally {
+            try {
+                pstmt.close();
+            } catch (SQLException e) {
+                return ReturnValue.ERROR;
+            }
+            try {
+                connection.close();
+            } catch (SQLException e) {
+                return ReturnValue.ERROR;
+            }
+        }
+        return ReturnValue.OK;
     }
+
     public static ReturnValue addSong(Song song)
     {
-        return null;
+        Connection connection = DBConnector.getConnection();
+        PreparedStatement pstmt = null;
+        try {
+            pstmt = connection.prepareStatement("INSERT INTO " + SONG_TABLE_NAME +
+                    "VALUES (?, ?, ?, ?, ?)");
+            pstmt.setInt(1, song.getId());
+            pstmt.setString(2, song.getName());
+            pstmt.setString(3, song.getGenre());
+            pstmt.setString(4, song.getCountry());
+//            pstmt.setInt(5, song.getPlayCount());
+            pstmt.setInt(5, 0); //TODO: CHECK
+
+            pstmt.execute();
+        } catch (SQLException e) {
+            return sqlExceptionToReturnValue(e);
+        }
+        finally {
+            try {
+                pstmt.close();
+            } catch (SQLException e) {
+                return ReturnValue.ERROR;
+            }
+            try {
+                connection.close();
+            } catch (SQLException e) {
+                return ReturnValue.ERROR;
+            }
+        }
+        return ReturnValue.OK;
     }
 
     public static Song getSong(Integer songId)
     {
-        return null;
+        Song song = new Song();
+        Connection connection = DBConnector.getConnection();
+        PreparedStatement pstmt = null;
+        try {
+            pstmt = connection.prepareStatement(SELECT_ALL_FIELDS +
+                    "FROM " + SONG_TABLE_NAME +
+                    "WHERE id = (?)");
+            pstmt.setInt(1, songId);
+
+            ResultSet res = pstmt.executeQuery();
+
+            if (res.next()) {
+                song.setId(res.getInt(1));
+                song.setName(res.getString(2));
+                song.setGenre(res.getString(3));
+                song.setCountry(res.getString(4));
+                song.setPlayCount(res.getInt(5));
+            } else {
+                song = Song.badSong();
+            }
+
+            res.close();
+        } catch (SQLException e) {
+            return Song.badSong();
+        }
+        finally {
+            try {
+                pstmt.close();
+            } catch (SQLException e) {
+                return Song.badSong();
+            }
+            try {
+                connection.close();
+            } catch (SQLException e) {
+                return Song.badSong();
+            }
+        }
+        return song;
     }
 
     public static ReturnValue deleteSong(Song song)
     {
-        return null;
+        Connection connection = DBConnector.getConnection();
+        PreparedStatement pstmt = null;
+        try {
+            pstmt = connection.prepareStatement("DELETE FROM " + SONG_TABLE_NAME + //", " + INCLUDES_TABLE_NAME +
+                    " WHERE id=?");
+            pstmt.setInt(1, song.getId());
+            int count = pstmt.executeUpdate();
+            if (count == 0) {
+                return ReturnValue.NOT_EXISTS;
+            }
+        } catch (SQLException e) {
+            return sqlExceptionToReturnValue(e);
+        }
+        finally {
+            try {
+                pstmt.close();
+            } catch (SQLException e) {
+                return ReturnValue.ERROR;
+            }
+            try {
+                connection.close();
+            } catch (SQLException e) {
+                return ReturnValue.ERROR;
+            }
+        }
+        return ReturnValue.OK;
     }
 
     public static ReturnValue updateSongName(Song song)
     {
-        return null;
+        Connection connection = DBConnector.getConnection();
+        PreparedStatement pstmt = null;
+        try {
+            pstmt = connection.prepareStatement(
+                    "UPDATE " + SONG_TABLE_NAME +
+                            "SET name=?\n" +
+                            "WHERE id=?");
+            pstmt.setString(1, song.getName());
+            pstmt.setInt(2, song.getId());
+            int count = pstmt.executeUpdate();
+            if (count == 0) {
+                return ReturnValue.NOT_EXISTS;
+            }
+        } catch (SQLException e) {
+            return sqlExceptionToReturnValue(e);
+        }
+        finally {
+            try {
+                pstmt.close();
+            } catch (SQLException e) {
+                return ReturnValue.ERROR;
+            }
+            try {
+                connection.close();
+            } catch (SQLException e) {
+                return ReturnValue.ERROR;
+            }
+        }
+        return ReturnValue.OK;
     }
 
     public static ReturnValue addPlaylist(Playlist playlist)
     {
-        return null;
+        Connection connection = DBConnector.getConnection();
+        PreparedStatement pstmt = null;
+        try {
+            pstmt = connection.prepareStatement("INSERT INTO " + PLAYLISTS_TABLE_NAME +
+                    " VALUES (?, ?, ?)");
+            pstmt.setInt(1, playlist.getId());
+            pstmt.setString(2, playlist.getGenre());
+            pstmt.setString(3, playlist.getDescription());
+
+            pstmt.execute();
+        } catch (SQLException e) {
+            return sqlExceptionToReturnValue(e);
+        }
+        finally {
+            try {
+                pstmt.close();
+            } catch (SQLException e) {
+                return ReturnValue.ERROR;
+            }
+            try {
+                connection.close();
+            } catch (SQLException e) {
+                return ReturnValue.ERROR;
+            }
+        }
+        return ReturnValue.OK;
     }
 
     public static Playlist getPlaylist(Integer playlistId)
     {
-        return null;
+//        if (playlistId == null) {
+//            return Playlist.badPlaylist(); //TODO: IS THIS REQUIRED?
+//        }
+        Playlist playlist = new Playlist();
+        Connection connection = DBConnector.getConnection();
+        PreparedStatement pstmt = null;
+        try {
+            pstmt = connection.prepareStatement(SELECT_ALL_FIELDS +
+                    "FROM " + PLAYLISTS_TABLE_NAME +
+                    "WHERE id = (?)");
+            pstmt.setInt(1, playlistId);
+
+            ResultSet res = pstmt.executeQuery();
+
+            if (res.next()) {
+                playlist.setId(res.getInt(1));
+                playlist.setGenre(res.getString(2));
+                playlist.setDescription(res.getString(3));
+            }
+
+            res.close();
+        } catch (SQLException e) {
+            return Playlist.badPlaylist();
+        } catch (NullPointerException e) {
+            return Playlist.badPlaylist();
+        }
+        finally {
+            try {
+                pstmt.close();
+            } catch (SQLException e) {
+                return Playlist.badPlaylist();
+            }
+            try {
+                connection.close();
+            } catch (SQLException e) {
+                return Playlist.badPlaylist();
+            }
+        }
+        return playlist;
     }
 
     public static ReturnValue deletePlaylist(Playlist playlist)
     {
-        return null;
+        Connection connection = DBConnector.getConnection();
+        PreparedStatement pstmt = null;
+        try {
+            pstmt = connection.prepareStatement("DELETE FROM " + PLAYLISTS_TABLE_NAME + //", " + INCLUDES_TABLE_NAME +
+                    " WHERE id=?");
+            pstmt.setInt(1, playlist.getId());
+            int count = pstmt.executeUpdate();
+            if (count == 0) {
+                return ReturnValue.NOT_EXISTS;
+            }
+        } catch (SQLException e) {
+            return sqlExceptionToReturnValue(e);
+        }
+        finally {
+            try {
+                pstmt.close();
+            } catch (SQLException e) {
+                return ReturnValue.ERROR;
+            }
+            try {
+                connection.close();
+            } catch (SQLException e) {
+                return ReturnValue.ERROR;
+            }
+        }
+        return ReturnValue.OK;
     }
 
     public static ReturnValue updatePlaylist(Playlist playlist)
     {
-        return null;
+        Connection connection = DBConnector.getConnection();
+        PreparedStatement pstmt = null;
+        try {
+            pstmt = connection.prepareStatement(
+                    "UPDATE " + PLAYLISTS_TABLE_NAME +
+                            "SET description=?\n" +
+                            "WHERE id=?");
+            pstmt.setString(1, playlist.getDescription());
+            pstmt.setInt(2, playlist.getId());
+            int count = pstmt.executeUpdate();
+            if (count == 0) {
+                return ReturnValue.NOT_EXISTS;
+            }
+        } catch (SQLException e) {
+            return sqlExceptionToReturnValue(e);
+        }
+        finally {
+            try {
+                pstmt.close();
+            } catch (SQLException e) {
+                return ReturnValue.ERROR;
+            }
+            try {
+                connection.close();
+            } catch (SQLException e) {
+                return ReturnValue.ERROR;
+            }
+        }
+        return ReturnValue.OK;
     }
 
-    public static ReturnValue addSongToPlaylist(Integer songid, Integer playlistId){
-        return null;
+    public static ReturnValue addSongToPlaylist(Integer songid, Integer playlistId)
+    {
+        Connection connection = DBConnector.getConnection();
+        PreparedStatement pstmt = null;
+        try {
+            pstmt = connection.prepareStatement("INSERT INTO " + INCLUDES_TABLE_NAME +
+                    " VALUES (?, ?)");
+            pstmt.setInt(1,songid);
+            pstmt.setInt(2,playlistId);
+
+
+            pstmt.execute();
+
+        } catch (SQLException e) {
+            if (sqlStateMatches(e, PostgreSQLErrorCodes.FOREIGN_KEY_VIOLATION)) {
+                return ReturnValue.BAD_PARAMS; //TODO: check
+            }
+            return sqlExceptionToReturnValue(e);
+        } catch (NullPointerException e) {
+            return ReturnValue.BAD_PARAMS;
+        }
+        finally {
+            try {
+                pstmt.close();
+            } catch (SQLException e) {
+                return ReturnValue.ERROR;
+            }
+            try {
+                connection.close();
+            } catch (SQLException e) {
+                return ReturnValue.ERROR;
+            }
+        }
+        return ReturnValue.OK;
     }
 
-    public static ReturnValue removeSongFromPlaylist(Integer songid, Integer playlistId){
-        return null;
+    public static ReturnValue removeSongFromPlaylist(Integer songid, Integer playlistId)
+    {
+        Connection connection = DBConnector.getConnection();
+        PreparedStatement pstmt = null;
+        try {
+            pstmt = connection.prepareStatement("DELETE FROM " + INCLUDES_TABLE_NAME +
+                    " WHERE sid=? AND pid=?");
+            pstmt.setInt(1, songid);
+            pstmt.setInt(2, playlistId);
+            int count = pstmt.executeUpdate();
+            if (count == 0) {
+                return ReturnValue.NOT_EXISTS;
+            }
+        } catch (SQLException e) {
+            return sqlExceptionToReturnValue(e);
+        } catch (NullPointerException e) {
+            return ReturnValue.NOT_EXISTS;
+        }
+        finally {
+            try {
+                pstmt.close();
+            } catch (SQLException e) {
+                return ReturnValue.ERROR;
+            }
+            try {
+                connection.close();
+            } catch (SQLException e) {
+                return ReturnValue.ERROR;
+            }
+        }
+        return ReturnValue.OK;
     }
 
-    public static ReturnValue followPlaylist(Integer userId, Integer playlistId){
-        return null;
+    public static ReturnValue followPlaylist(Integer userId, Integer playlistId)
+    {
+        Connection connection = DBConnector.getConnection();
+        PreparedStatement pstmt = null;
+        try {
+            pstmt = connection.prepareStatement("INSERT INTO " + FOLLOWS_TABLE_NAME +
+                    " VALUES (?, ?)");
+            pstmt.setInt(1,userId);
+            pstmt.setInt(2,playlistId);
+
+
+            pstmt.execute();
+
+        } catch (SQLException e) {
+            return sqlExceptionToReturnValue(e);
+        } catch (NullPointerException e) {
+            return ReturnValue.NOT_EXISTS;
+        }
+        finally {
+            try {
+                pstmt.close();
+            } catch (SQLException e) {
+                return ReturnValue.ERROR;
+            }
+            try {
+                connection.close();
+            } catch (SQLException e) {
+                return ReturnValue.ERROR;
+            }
+        }
+        return ReturnValue.OK;
     }
 
-    public static ReturnValue stopFollowPlaylist(Integer userId, Integer playlistId){
-        return null;
+    public static ReturnValue stopFollowPlaylist(Integer userId, Integer playlistId)
+    {
+        Connection connection = DBConnector.getConnection();
+        PreparedStatement pstmt = null;
+        try {
+            pstmt = connection.prepareStatement("DELETE FROM " + FOLLOWS_TABLE_NAME +
+                    " WHERE uid=? AND pid=?");
+            pstmt.setInt(1, userId);
+            pstmt.setInt(2, playlistId);
+            int count = pstmt.executeUpdate();
+            if (count == 0) {
+                return ReturnValue.NOT_EXISTS;
+            }
+        } catch (SQLException e) {
+            return sqlExceptionToReturnValue(e);
+        } catch (NullPointerException e) {
+            return ReturnValue.NOT_EXISTS;
+        }
+        finally {
+            try {
+                pstmt.close();
+            } catch (SQLException e) {
+                return ReturnValue.ERROR;
+            }
+            try {
+                connection.close();
+            } catch (SQLException e) {
+                return ReturnValue.ERROR;
+            }
+        }
+        return ReturnValue.OK;
     }
 
-    public static ReturnValue songPlay(Integer songId, Integer times){
-        return null;
+    public static ReturnValue songPlay(Integer songId, Integer times)
+    {
+        Connection connection = DBConnector.getConnection();
+        Song s = new Song();
+        if (songId == null) {
+            return ReturnValue.BAD_PARAMS; //TODO: check
+        }
+        s.setId(songId);
+        PreparedStatement songPlayCount = null;
+        try {
+            songPlayCount = connection.prepareStatement("SELECT playCount " +
+                    "FROM " + SONG_TABLE_NAME +
+                    "WHERE id = (?)");
+            songPlayCount.setInt(1, songId);
+            ResultSet res = songPlayCount.executeQuery();
+            if (res.next()) {
+                s.setPlayCount(res.getInt(1));
+            }
+            res.close();
+        } catch (SQLException e) {
+            return sqlExceptionToReturnValue(e);
+        }
+
+        PreparedStatement pstmt = null;
+        int newPlayCount = s.getPlayCount() + times;
+
+        try {
+            pstmt = connection.prepareStatement(
+                    "UPDATE " + SONG_TABLE_NAME +
+                            "SET playCount=?\n" +
+                            "WHERE id=?");
+            pstmt.setInt(1,newPlayCount);
+            pstmt.setInt(2,songId); //TODO: WHY playcount + times DOESNT WORK?
+            int count = pstmt.executeUpdate();
+            if (count == 0) {
+                return ReturnValue.NOT_EXISTS;
+            }
+        } catch (SQLException e) {
+            return sqlExceptionToReturnValue(e);
+        }
+        finally {
+            try {
+                pstmt.close();
+            } catch (SQLException e) {
+                return ReturnValue.ERROR;
+            }
+            try {
+                connection.close();
+            } catch (SQLException e) {
+                return ReturnValue.ERROR;
+            }
+        }
+        return ReturnValue.OK;
     }
 
     public static Integer getPlaylistTotalPlayCount(Integer playlistId){
         return null;
     }
 
-    public static Integer getPlaylistFollowersCount(Integer playlistId){
-        return null;
+    public static Integer getPlaylistFollowersCount(Integer playlistId)
+    {
+        int count = 0;
+        Connection connection = DBConnector.getConnection();
+        PreparedStatement pstmt = null;
+        try {
+            pstmt = connection.prepareStatement("SELECT COUNT(uid)" +
+                    "FROM " + FOLLOWS_TABLE_NAME +
+                    "WHERE pid=?");
+            pstmt.setInt(1, playlistId);
+
+            ResultSet res = pstmt.executeQuery();
+
+            if (res.next()) {
+                count = res.getInt(1);
+            }
+
+            res.close();
+        } catch (SQLException e) {
+            return 0;
+        }
+        finally {
+            try {
+                pstmt.close();
+            } catch (SQLException e) {
+                return 0;
+            }
+            try {
+                connection.close();
+            } catch (SQLException e) {
+                return 0;
+            }
+        }
+        return count;
     }
 
     public static String getMostPopularSong(){
@@ -139,8 +854,51 @@ public class Solution {
         return null;
     }
 
-    public static ArrayList<Integer> getSimilarUsers(Integer userId){
-        return null;
+    public static ArrayList<Integer> getSimilarUsers(Integer userId)
+    {
+        ArrayList<Integer> arr = new ArrayList<>();
+        Connection connection = DBConnector.getConnection();
+        PreparedStatement pstmt = null;
+        String relevantPlaylistQuery = "(SELECT L2.uid AS uid, COUNT(L2.pid) AS c" +
+                " FROM " + FOLLOWS_TABLE_NAME + " L1," + FOLLOWS_TABLE_NAME + " L2" +
+                " WHERE L1.uid=? AND L2.uid<>? AND L1.pid=L2.pid \n" +
+                " GROUP BY L2.uid)";
+
+        String userCountQuery = "(SELECT COUNT(pid) FROM " + FOLLOWS_TABLE_NAME + " WHERE uid=?)*0.75";
+        try {
+            pstmt = connection.prepareStatement(
+                    "SELECT R.uid FROM "+ relevantPlaylistQuery +" AS R\n" +
+                            " WHERE R.c>="+ userCountQuery + " \n" +
+                            " ORDER BY R.uid ASC" +
+                            " LIMIT 10");
+            pstmt.setInt(1, userId);
+            pstmt.setInt(2, userId);
+            pstmt.setInt(3, userId);
+
+            ResultSet res = pstmt.executeQuery();
+
+            while (res.next()) {
+                int s = res.getInt(1);
+                arr.add(s);
+            }
+
+            res.close();
+        } catch (SQLException e) {
+            return arr;
+        }
+        finally {
+            try {
+                pstmt.close();
+            } catch (SQLException e) {
+                return arr;
+            }
+            try {
+                connection.close();
+            } catch (SQLException e) {
+                return arr;
+            }
+        }
+        return arr;
     }
 
     public static ArrayList<Integer> getTopCountryPlaylists(Integer userId) {
@@ -154,7 +912,22 @@ public class Solution {
     public static ArrayList<Integer> getSongsRecommendationByGenre(Integer userId, String genre){
         return null;
     }
+    private static ReturnValue sqlExceptionToReturnValue(SQLException e) {
+        if (sqlStateMatches(e, PostgreSQLErrorCodes.FOREIGN_KEY_VIOLATION)) {
+            return ReturnValue.NOT_EXISTS;
+        } else if (sqlStateMatches(e, PostgreSQLErrorCodes.UNIQUE_VIOLATION)) {
+            return ReturnValue.ALREADY_EXISTS;
+        } else if (sqlStateMatches(e, PostgreSQLErrorCodes.CHECK_VIOLATION) || sqlStateMatches(e, PostgreSQLErrorCodes.NOT_NULL_VIOLATION)) {
+            return ReturnValue.BAD_PARAMS;
+        } else {
+            return ReturnValue.ERROR;
+        }
+    }
 
+    private static boolean sqlStateMatches(SQLException e, PostgreSQLErrorCodes error) {
+        String errorString = Integer.toString(error.getValue());
+        return e.getSQLState().equals(errorString);
+    }
 
 }
 
