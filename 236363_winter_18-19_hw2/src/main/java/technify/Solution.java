@@ -23,8 +23,10 @@ public class Solution {
     private static final String INCLUDES_TABLE_NAME = "Includes ";
     private static final String FOLLOWS_TABLE_NAME = "Follows ";
     private static final String PLAYLISTS_SONGS_VIEW = "PlaylistsSongs ";
-//    private static final String PLAYLISTS_SONGS_VIEW = "PlaylistsUsers ";
+    private static final String PLAYLISTS_USERS_VIEW = "PlaylistsUsers ";
     private static final String PLAYLIST_RATING_VIEW = "PlaylistRating ";
+    private static final String SIMILAR_USERS_VIEW = "SimilarUsers ";
+    private static final String SHARED_PLAYLISTS_VIEW = "SharePlaylists ";
     // COMMANDS
     private static final String CREATE_TABLE = "CREATE TABLE ";
     private static final String CREATE_VIEW = "CREATE VIEW ";
@@ -88,21 +90,45 @@ public class Solution {
                     "    PRIMARY KEY (uid,pid)" +
                     ")");
             pstmt.execute();
-            pstmt = connection.prepareStatement(CREATE_VIEW + PLAYLISTS_SONGS_VIEW + "as " +
-                    SELECT + "id as pid, sid, name, " + PLAYLISTS_TABLE_NAME + ".genre, country, COALESCE(playcount, 0) as playcount, description\n" +
-                            "from " + PLAYLISTS_TABLE_NAME + " LEFT JOIN (\n" +
-                            "\tSELECT pid, sid, name, genre, country, playcount\n" +
-                            "\tFROM " + SONG_TABLE_NAME + " S JOIN " + INCLUDES_TABLE_NAME + " P\n" +
-                            "\tON S.id = P.sid\n" +
+            pstmt = connection.prepareStatement(CREATE_VIEW + PLAYLISTS_USERS_VIEW + "as " +
+                    SELECT + "id as pid, uid, name, " + PLAYLISTS_TABLE_NAME + ".genre, country, premium, description\n" +
+                            "FROM " + PLAYLISTS_TABLE_NAME + " LEFT JOIN (\n" +
+                            "\tSELECT pid, uid, name, country, premium\n" +
+                            "\tFROM " + USERS_TABLE_NAME + " S JOIN " + FOLLOWS_TABLE_NAME + " P\n" +
+                            "\tON S.id = P.uid\n" +
                             ") AS playlistssongs\n" +
                             "on playlistssongs.pid = " + PLAYLISTS_TABLE_NAME + ".id"
+                        );
+            pstmt.execute();
+            pstmt = connection.prepareStatement(CREATE_VIEW + PLAYLISTS_SONGS_VIEW + "as " +
+                    SELECT + "P.id as pid, L1.id as sid, name, COALESCE(L1.genre,P.genre) as genre, country, COALESCE(playcount, 0) as playcount, description\n" +
+                            "FROM " + PLAYLISTS_TABLE_NAME + " P FULL JOIN (\n" +
+                            "\tSELECT id, pid, genre, name, country, playcount\n" +
+                            "\tFROM " + SONG_TABLE_NAME + " S FULL JOIN " + INCLUDES_TABLE_NAME + " I\n" +
+                            "\tON S.id = I.sid\n" +
+                            ") AS L1\n" +
+                            "on L1.pid = P.id"
                         );
             pstmt.execute();
             pstmt = connection.prepareStatement(CREATE_VIEW + PLAYLIST_RATING_VIEW + "as " +
                     "    SELECT pid, songcount, playcount, COALESCE(playcount/NULLIF(songcount, 0), 0) as rating FROM ( \n" +
                     "       SELECT pid, COUNT(sid) as songcount, SUM(playcount) as playcount\n" +
-                    "       FROM PlaylistsSongs \n" +
+                    "       FROM " + PLAYLISTS_SONGS_VIEW + "\n" +
+                    "       WHERE pid IS NOT NULL\n" +
                     "       GROUP BY pid\n) AS counters");
+            pstmt.execute();
+            pstmt = connection.prepareStatement(CREATE_VIEW + SHARED_PLAYLISTS_VIEW + "as " +
+                            "SELECT L1.uid AS uid, L2.uid AS otherUid, L1.pid, L1.premium\n" +
+                            " FROM " + PLAYLISTS_USERS_VIEW + " L1," + PLAYLISTS_USERS_VIEW + " L2" +
+                            " WHERE L1.uid<>L2.uid AND L1.pid=L2.pid");
+            pstmt.execute();
+            pstmt = connection.prepareStatement(CREATE_VIEW + SIMILAR_USERS_VIEW + "as " +
+                    SELECT + "uid, otherUid, premium FROM\n" +
+                    "   (SELECT uid, otherUid, COUNT(pid) as sharedCount, premium\n" +
+                    "   FROM " + SHARED_PLAYLISTS_VIEW + " AS L3\n" +
+                    "   GROUP BY uid, otherUid, premium) AS L4\n" +
+                    "WHERE sharedCount >= " +
+                    "(SELECT COUNT(pid) FROM " + FOLLOWS_TABLE_NAME + " WHERE uid=L4.uid)*0.75" + "\n");
             pstmt.execute();
             //TODO: check if DELETE ON CASCADE works
         } catch (SQLException var15) {
@@ -918,19 +944,18 @@ public class Solution {
     public static String getMostPopularSong(){
         Connection connection = DBConnector.getConnection();
         PreparedStatement pstmt = null;
-        String name = null;
+        String name = NO_SONGS;
         try {
             pstmt = connection.prepareStatement(SELECT + "name, sid, COUNT(pid) as playlistcount " +
                     "FROM " + PLAYLISTS_SONGS_VIEW +
-                    "GROUP BY sid, name" +
+                    "WHERE sid IS NOT NULL\n" +
+                    "GROUP BY sid, name\n" +
                     "ORDER BY playlistcount DESC, sid DESC " +
                     "LIMIT 1");
 
             ResultSet res = pstmt.executeQuery();
 
-            if (getIncludesCount() == 0) {
-                name = NO_SONGS;
-            } else if (res.next()) {
+            if (res.next()) {
                 name = res.getString(1);
             }
 
@@ -962,6 +987,7 @@ public class Solution {
         try {
             pstmt = connection.prepareStatement(SELECT + "pid, SUM(playcount) as playcount " +
                     "FROM " + PLAYLISTS_SONGS_VIEW +
+                    "WHERE pid IS NOT NULL\n" +
                     "GROUP BY pid " +
                     "ORDER BY playcount DESC, pid DESC " +
                     "LIMIT 1");
@@ -1034,21 +1060,14 @@ public class Solution {
         ArrayList<Integer> arr = new ArrayList<>();
         Connection connection = DBConnector.getConnection();
         PreparedStatement pstmt = null;
-        String relevantPlaylistQuery = "(SELECT L2.uid AS uid, COUNT(L2.pid) AS c" +
-                " FROM " + FOLLOWS_TABLE_NAME + " L1," + FOLLOWS_TABLE_NAME + " L2" +
-                " WHERE L1.uid=? AND L2.uid<>? AND L1.pid=L2.pid \n" +
-                " GROUP BY L2.uid)";
-
-        String userCountQuery = "(SELECT COUNT(pid) FROM " + FOLLOWS_TABLE_NAME + " WHERE uid=?)*0.75";
         try {
             pstmt = connection.prepareStatement(
-                    "SELECT R.uid FROM "+ relevantPlaylistQuery +" AS R\n" +
-                            " WHERE R.c>="+ userCountQuery + " \n" +
-                            " ORDER BY R.uid ASC" +
-                            " LIMIT 10");
+                    SELECT + "otherUid\n" +
+                            "FROM " + SIMILAR_USERS_VIEW + "\n" +
+                            "WHERE uid=? AND premium=true\n" +
+                            "ORDER BY otherUid ASC\n" +
+                            "LIMIT 10");
             pstmt.setInt(1, userId);
-            pstmt.setInt(2, userId);
-            pstmt.setInt(3, userId);
 
             ResultSet res = pstmt.executeQuery();
 
@@ -1079,18 +1098,18 @@ public class Solution {
     public static ArrayList<Integer> getTopCountryPlaylists(Integer userId) {
         ArrayList<Integer> arr = new ArrayList<>();
         Connection connection = DBConnector.getConnection();
-        PreparedStatement pstmt = null;
         User user = getUserProfile(userId);
         if (user.equals(User.badUser()) || !user.getPremium()) {
             return arr;
         }
+        PreparedStatement pstmt = null;
         try {
             pstmt = connection.prepareStatement(SELECT + "pid\nFROM (\n" +
                     "   SELECT L1.pid, SUM(playcount) as playcount\n" +
                     "   FROM " + PLAYLIST_RATING_VIEW + "L1 RIGHT JOIN (\n" +
                     "           SELECT pid\n" +
                     "           FROM " + PLAYLISTS_SONGS_VIEW + "\n" +
-                    "           WHERE country=?\n" +
+                    "           WHERE country=? AND pid IS NOT NULL\n" +
                     "       ) AS L2 \n" +
                     "   ON L1.pid = L2.pid\n" +
                     "   WHERE L1.pid = L2.pid\n" +
@@ -1127,12 +1146,101 @@ public class Solution {
     }
 
     public static ArrayList<Integer> getPlaylistRecommendation (Integer userId){
-        return null;
+        ArrayList<Integer> arr = new ArrayList<>();
+        Connection connection = DBConnector.getConnection();
+        PreparedStatement pstmt = null;
+        try {
+            String similarUsersList = "(" + SELECT + "otherUid\n" +
+                            "FROM " + SIMILAR_USERS_VIEW + "\n" +
+                            "WHERE uid=?)";
+            String playlists = "(" + SELECT + "pid\nFROM " + FOLLOWS_TABLE_NAME + "\nWHERE uid=?)";
+            String sharedPlaylistByOthers = "(" +
+                    SELECT + "*\n" +
+                    "FROM " + SHARED_PLAYLISTS_VIEW + "\n" +
+                    "WHERE pid NOT IN " + playlists + ") AS L1 ";
+            String sharedPlaylistsByCount = "(" +
+                    SELECT + "pid, COUNT(otherUid) as count\n" +
+                    "FROM " + sharedPlaylistByOthers;
+            pstmt = connection.prepareStatement(SELECT + "pid\n" +
+                    "FROM " + sharedPlaylistsByCount + "\n" +
+                    "WHERE uid <> ? AND otherUid in " + similarUsersList + "\n" +
+                    "GROUP BY pid) AS L2\n" +
+                    "ORDER BY pid ASC\n" +
+                    "LIMIT 5");
+
+            pstmt.setInt(1, userId);
+            pstmt.setInt(2, userId);
+            pstmt.setInt(3, userId);
+
+            ResultSet res = pstmt.executeQuery();
+
+            while (res.next()) {
+                int s = res.getInt(1);
+                arr.add(s);
+            }
+
+            res.close();
+        } catch (SQLException e) {
+            return arr;
+        }
+        finally {
+            try {
+                pstmt.close();
+            } catch (SQLException e) {
+                return arr;
+            }
+            try {
+                connection.close();
+            } catch (SQLException e) {
+                return arr;
+            }
+        }
+        return arr;
     }
 
     public static ArrayList<Integer> getSongsRecommendationByGenre(Integer userId, String genre){
-        return null;
+        ArrayList<Integer> arr = new ArrayList<>();
+        Connection connection = DBConnector.getConnection();
+        PreparedStatement pstmt = null;
+        try {
+            pstmt = connection.prepareStatement(
+                    SELECT + "sid\n" +
+                    "FROM " + PLAYLISTS_SONGS_VIEW + "\n" +
+                    "WHERE pid not in (SELECT pid FROM " + FOLLOWS_TABLE_NAME + " WHERE uid<>?) AND " +
+                        "genre=?\n" +
+                    "ORDER BY playcount DESC, sid ASC\n" +
+                    "LIMIT 5");
+            pstmt.setInt(1, userId);
+            pstmt.setString(2, genre);
+
+            ResultSet res = pstmt.executeQuery();
+
+            while (res.next()) {
+                int s = res.getInt(1);
+                arr.add(s);
+            }
+
+            res.close();
+        } catch (SQLException e) {
+            return arr;
+        } catch (NullPointerException e) {
+            return arr;
+        }
+        finally {
+            try {
+                pstmt.close();
+            } catch (SQLException e) {
+                return arr;
+            }
+            try {
+                connection.close();
+            } catch (SQLException e) {
+                return arr;
+            }
+        }
+        return arr;
     }
+
     private static ReturnValue sqlExceptionToReturnValue(SQLException e) {
         if (sqlStateMatches(e, PostgreSQLErrorCodes.FOREIGN_KEY_VIOLATION)) {
             return ReturnValue.NOT_EXISTS;

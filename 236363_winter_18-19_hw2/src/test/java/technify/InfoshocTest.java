@@ -1009,6 +1009,16 @@ public class InfoshocTest extends AbstractTest { //CREATE USER FUNCTION ISSUES
         );
 
         assertEquals(
+                new ArrayList<Integer>(),
+                Solution.getSimilarUsers(user2.getId())
+        );
+
+        assertEquals(
+                new ArrayList<Integer>(),
+                Solution.getSimilarUsers(user4.getId())
+        );
+
+        assertEquals(
                 new ArrayList<Integer>(){{
                     // They told no user :/
 //                    add(user1.getId());
@@ -1023,55 +1033,55 @@ public class InfoshocTest extends AbstractTest { //CREATE USER FUNCTION ISSUES
         // TODO: test limit etc
     }
 
-    @Test
+    @Test //DONE
     public void getPlaylistRecommendationTest() {
         User[] users = new User[40];
         Playlist[] playLists = new Playlist[40];
 
 //        assertEquals(new ArrayList<Integer>(), Solution.getPlaylistRecommendation(null));
-//        assertEquals(new ArrayList<Integer>(), Solution.getPlaylistRecommendation(-1));
-//        assertEquals(new ArrayList<Integer>(), Solution.getPlaylistRecommendation(0));
-//        assertEquals(new ArrayList<Integer>(), Solution.getPlaylistRecommendation(1));
-//
-//        for (int i = 1; i < playLists.length; ++i) {
-//            playLists[i] = createPlayList(i, "Power", "Helloween");
-//            assertOK(Solution.addPlaylist(playLists[i]));
-//        }
-//
-//        for (int i = 1; i < users.length; ++i) {
-//            users[i] = createUser(i, "Andy", "Germany", i % 2 == 0);
-//            assertOK(Solution.addUser(users[i]));
-//            assertEquals(new ArrayList<Integer>(), Solution.getPlaylistRecommendation(i));
-//
-//            for (int j = 1; j <= i; ++j) {
-//                assertOK(Solution.followPlaylist(i, j));
-//            }
-//        }
-//
-//        assertEquals(
-//                new ArrayList<Integer>(){{
-//                    add(2);
-//                    add(3);
-//                    add(4);
-//                    add(5);
-//                    add(6);
-//                }},
-//                Solution.getPlaylistRecommendation(1)
-//        );
-//
-//        assertEquals(
-//                new ArrayList<Integer>(){{
-//                    add(21);
-//                    add(22);
-//                    add(23);
-//                    add(24);
-//                    add(25);
-//                }},
-//                Solution.getPlaylistRecommendation(20)
-//        );
+        assertEquals(new ArrayList<Integer>(), Solution.getPlaylistRecommendation(-1));
+        assertEquals(new ArrayList<Integer>(), Solution.getPlaylistRecommendation(0));
+        assertEquals(new ArrayList<Integer>(), Solution.getPlaylistRecommendation(1));
+
+        for (int i = 1; i < playLists.length; ++i) {
+            playLists[i] = createPlayList(i, "Power", "Helloween");
+            assertOK(Solution.addPlaylist(playLists[i]));
+        }
+
+        for (int i = 1; i < users.length; ++i) {
+            users[i] = createUser(i, "Andy", "Germany", i % 2 == 0);
+            assertOK(Solution.addUser(users[i]));
+            assertEquals(new ArrayList<Integer>(), Solution.getPlaylistRecommendation(i));
+
+            for (int j = 1; j <= i; ++j) {
+                assertOK(Solution.followPlaylist(i, j));
+            }
+        }
+
+        assertEquals(
+                new ArrayList<Integer>(){{
+                    add(2);
+                    add(3);
+                    add(4);
+                    add(5);
+                    add(6);
+                }},
+                Solution.getPlaylistRecommendation(1)
+        );
+
+        assertEquals(
+                new ArrayList<Integer>(){{
+                    add(21);
+                    add(22);
+                    add(23);
+                    add(24);
+                    add(25);
+                }},
+                Solution.getPlaylistRecommendation(20)
+        );
     }
 
-    @Test
+    @Test //DONE NOT ENOUGH TESTS
     public void getTopCountryPlaylistsTest() {
         User user1 = createUser(1, "Mark", "USA", false);
         User user2 = createUser(2, "Travis", "USA", true);
@@ -1139,72 +1149,76 @@ public class InfoshocTest extends AbstractTest { //CREATE USER FUNCTION ISSUES
         Song song3 = createSong(3, "Aren't", "Punk", "USA", 0);
         Song song4 = createSong(4, "All", "Punk", "USA", 0);
         Song song5 = createSong(5, "Right", "Punk", "USA", 0);
+        Song song6 = createSong(6, "Right", "Alternative", "USA", 0);
         String injectionGenre = "'; DROP TABLE songs CASCADE;--";
         Song songInjectionGenre = createSong(42, "I Want Out", injectionGenre, "USA", 0);
 
-//        assertEquals(new ArrayList<Integer>(), Solution.getSongsRecommendationByGenre(null, null));
-//        assertEquals(new ArrayList<Integer>(), Solution.getSongsRecommendationByGenre(null, ""));
-//        assertEquals(new ArrayList<Integer>(), Solution.getSongsRecommendationByGenre(-1, null));
-//        assertEquals(new ArrayList<Integer>(), Solution.getSongsRecommendationByGenre(-1, ""));
-//        assertEquals(new ArrayList<Integer>(), Solution.getSongsRecommendationByGenre(0, null));
-//        assertEquals(new ArrayList<Integer>(), Solution.getSongsRecommendationByGenre(0, ""));
-//        assertEquals(new ArrayList<Integer>(), Solution.getSongsRecommendationByGenre(1, null));
-//        assertEquals(new ArrayList<Integer>(), Solution.getSongsRecommendationByGenre(1, ""));
-//
-//        assertOK(Solution.addSong(song1));
-//        assertOK(Solution.addSong(song2));
-//        assertOK(Solution.addSong(song3));
-//        assertOK(Solution.addSong(song4));
-//        assertOK(Solution.addSong(song5));
-//        assertOK(Solution.addPlaylist(playlist1));
-//        assertOK(Solution.addPlaylist(playlist2));
-//        assertOK(Solution.addUser(user1));
-//        assertOK(Solution.addUser(user2));
-//
-//        assertOK(Solution.songPlay(5, 5));
-//        assertOK(Solution.songPlay(2, 5));
-//        assertOK(Solution.songPlay(3, 3));
-//        assertOK(Solution.songPlay(4, 2));
-//        assertOK(Solution.songPlay(1, 1));
-//        assertOK(Solution.followPlaylist(1, 1));
-//        assertOK(Solution.followPlaylist(2, 2));
-//
-//        assertEquals(new ArrayList<Integer>(){{
-//            add(2);
-//            add(5);
-//            add(3);
-//            add(4);
-//            add(1);
-//        }}, Solution.getSongsRecommendationByGenre(1, "Punk"));
-//
-//        assertEquals(new ArrayList<Integer>(){{
-//            add(2);
-//            add(5);
-//            add(3);
-//            add(4);
-//            add(1);
-//        }}, Solution.getSongsRecommendationByGenre(2, "Punk"));
-//
-//        assertOK(Solution.addSongToPlaylist(5, 1));
-//
-//        assertEquals(new ArrayList<Integer>(){{
-//            add(2);
-//            add(3);
-//            add(4);
-//            add(1);
-//        }}, Solution.getSongsRecommendationByGenre(1, "Punk"));
-//
-//        assertEquals(new ArrayList<Integer>(){{
-//            add(2);
-//            add(5);
-//            add(3);
-//            add(4);
-//            add(1);
-//        }}, Solution.getSongsRecommendationByGenre(2, "Punk"));
-//
-//        assertOK(Solution.addSong(songInjectionGenre));
-//
-//        assertEquals(new ArrayList<Integer>(){{add(42);}}, Solution.getSongsRecommendationByGenre(1, injectionGenre));
+        assertEquals(new ArrayList<Integer>(), Solution.getSongsRecommendationByGenre(null, null));
+        assertEquals(new ArrayList<Integer>(), Solution.getSongsRecommendationByGenre(null, ""));
+        assertEquals(new ArrayList<Integer>(), Solution.getSongsRecommendationByGenre(-1, null));
+        assertEquals(new ArrayList<Integer>(), Solution.getSongsRecommendationByGenre(-1, ""));
+        assertEquals(new ArrayList<Integer>(), Solution.getSongsRecommendationByGenre(0, null));
+        assertEquals(new ArrayList<Integer>(), Solution.getSongsRecommendationByGenre(0, ""));
+        assertEquals(new ArrayList<Integer>(), Solution.getSongsRecommendationByGenre(1, null));
+        assertEquals(new ArrayList<Integer>(), Solution.getSongsRecommendationByGenre(1, ""));
+
+        assertOK(Solution.addSong(song1));
+        assertOK(Solution.addSong(song2));
+        assertOK(Solution.addSong(song3));
+        assertOK(Solution.addSong(song4));
+        assertOK(Solution.addSong(song5));
+        assertOK(Solution.addSong(song6));
+        assertOK(Solution.addPlaylist(playlist1));
+        assertOK(Solution.addPlaylist(playlist2));
+        assertOK(Solution.addUser(user1));
+        assertOK(Solution.addUser(user2));
+
+        assertOK(Solution.addSongToPlaylist(song1.getId(), playlist1.getId()));
+
+        assertOK(Solution.songPlay(5, 5));
+        assertOK(Solution.songPlay(2, 5));
+        assertOK(Solution.songPlay(3, 3));
+        assertOK(Solution.songPlay(4, 2));
+        assertOK(Solution.songPlay(1, 1));
+        assertOK(Solution.followPlaylist(1, 1));
+        assertOK(Solution.followPlaylist(2, 2));
+
+        assertEquals(new ArrayList<Integer>(){{
+            add(2);
+            add(5);
+            add(3);
+            add(4);
+            add(1);
+        }}, Solution.getSongsRecommendationByGenre(1, "Punk"));
+
+        assertEquals(new ArrayList<Integer>(){{
+            add(2);
+            add(5);
+            add(3);
+            add(4);
+            add(1);
+        }}, Solution.getSongsRecommendationByGenre(2, "Punk"));
+
+        assertOK(Solution.addSongToPlaylist(5, 1));
+
+        assertEquals(new ArrayList<Integer>(){{
+            add(2);
+            add(3);
+            add(4);
+            add(1);
+        }}, Solution.getSongsRecommendationByGenre(1, "Punk"));
+
+        assertEquals(new ArrayList<Integer>(){{
+            add(2);
+            add(5);
+            add(3);
+            add(4);
+            add(1);
+        }}, Solution.getSongsRecommendationByGenre(2, "Punk"));
+
+        assertOK(Solution.addSong(songInjectionGenre));
+
+        assertEquals(new ArrayList<Integer>(){{add(42);}}, Solution.getSongsRecommendationByGenre(1, injectionGenre));
     }
 
     @Test //DONE
