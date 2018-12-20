@@ -948,7 +948,7 @@ public class Solution {
         try {
             pstmt = connection.prepareStatement(SELECT + "name, sid, COUNT(pid) as playlistcount " +
                     "FROM " + PLAYLISTS_SONGS_VIEW +
-                    "WHERE sid IS NOT NULL\n" +
+                    "WHERE sid IS NOT NULL AND pid IS NOT NULL\n" +
                     "GROUP BY sid, name\n" +
                     "ORDER BY playlistcount DESC, sid DESC " +
                     "LIMIT 1");
