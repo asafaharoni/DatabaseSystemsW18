@@ -22,10 +22,17 @@ public class Solution {
     private static final String PLAYLISTS_TABLE_NAME = "Playlists ";
     private static final String INCLUDES_TABLE_NAME = "Includes ";
     private static final String FOLLOWS_TABLE_NAME = "Follows ";
+    private static final String PLAYLISTS_SONGS_VIEW = "PlaylistsSongs ";
+//    private static final String PLAYLISTS_SONGS_VIEW = "PlaylistsUsers ";
+    private static final String PLAYLIST_PLAY_COUNT_VIEW = "PlaylistPlayCount ";
+    private static final String PLAYLIST_RATING_VIEW = "PlaylistRating ";
     // COMMANDS
-    private static final String CREATE = "CREATE TABLE ";
+    private static final String CREATE_TABLE = "CREATE TABLE ";
+    private static final String CREATE_VIEW = "CREATE VIEW ";
     private static final String SELECT_ALL_FIELDS = "SELECT * ";
     private static final String SELECT = "SELECT ";
+    // STRING RESULTS
+    private static final String NO_SONGS = "No songs";
 
 
     public static void createTables()
@@ -33,7 +40,7 @@ public class Solution {
         Connection connection = DBConnector.getConnection();
         PreparedStatement pstmt = null;
         try{
-            pstmt = connection.prepareStatement(CREATE + SONG_TABLE_NAME +
+            pstmt = connection.prepareStatement(CREATE_TABLE + SONG_TABLE_NAME +
                     "(\n" +
                     "    id integer,\n" +
                     "    name text NOT NULL,\n" +
@@ -45,7 +52,7 @@ public class Solution {
                     "    CHECK (playCount >= 0)\n" +
                     ");");
             pstmt.execute();
-            pstmt = connection.prepareStatement(CREATE + USERS_TABLE_NAME +
+            pstmt = connection.prepareStatement(CREATE_TABLE + USERS_TABLE_NAME +
                     "(\n" +
                     "    id integer,\n" +
                     "    name text NOT NULL,\n" +
@@ -55,7 +62,7 @@ public class Solution {
                     "    CHECK (id > 0)\n" +
                     ");");
             pstmt.execute();
-            pstmt = connection.prepareStatement(CREATE + PLAYLISTS_TABLE_NAME +
+            pstmt = connection.prepareStatement(CREATE_TABLE + PLAYLISTS_TABLE_NAME +
                     "(\n" +
                     "    id integer,\n" +
                     "    genre text NOT NULL," +
@@ -64,17 +71,16 @@ public class Solution {
                     "    CHECK (id > 0)\n" +
                     ")");
             pstmt.execute();
-            pstmt = connection.prepareStatement(CREATE + INCLUDES_TABLE_NAME +
+            pstmt = connection.prepareStatement(CREATE_TABLE + INCLUDES_TABLE_NAME +
                     "(\n" +
+                    "    pid integer NOT NULL,\n" +
                     "    sid integer NOT NULL,\n" +
-                    "    pid integer NOT NULL ,\n" +
                     "    CONSTRAINT song_exists FOREIGN KEY (sid) REFERENCES " + SONG_TABLE_NAME + "(id) ON DELETE CASCADE,\n" +
                     "    CONSTRAINT playlist_exists FOREIGN KEY (pid) REFERENCES " + PLAYLISTS_TABLE_NAME + "(id) ON DELETE CASCADE,\n" +
-//                    "    CHECK " + SONG_TABLE_NAME + "(id) == " + PLAYLISTS_TABLE_NAME + "(id)," + //TODO: NOT WORKING
                     "    PRIMARY KEY (sid,pid)" +
                     ")");
             pstmt.execute();
-            pstmt = connection.prepareStatement(CREATE + FOLLOWS_TABLE_NAME +
+            pstmt = connection.prepareStatement(CREATE_TABLE + FOLLOWS_TABLE_NAME +
                     "(\n" +
                     "    uid integer NOT NULL,\n" +
                     "    pid integer NOT NULL ,\n" +
@@ -83,6 +89,21 @@ public class Solution {
                     "    PRIMARY KEY (uid,pid)" +
                     ")");
             pstmt.execute();
+            pstmt = connection.prepareStatement(CREATE_VIEW + PLAYLISTS_SONGS_VIEW + "as " +
+                    SELECT + "id as pid, sid, name, " + PLAYLISTS_TABLE_NAME + ".genre, country, COALESCE(playcount, 0) as playcount, description\n" +
+                            "from " + PLAYLISTS_TABLE_NAME + " LEFT JOIN (\n" +
+                            "\tSELECT pid, sid, name, genre, country, playcount\n" +
+                            "\tFROM " + SONG_TABLE_NAME + " S JOIN " + INCLUDES_TABLE_NAME + " P\n" +
+                            "\tON S.id = P.sid\n" +
+                            ") AS playlistssongs\n" +
+                            "on playlistssongs.pid = " + PLAYLISTS_TABLE_NAME + ".id"
+                        );
+            pstmt.execute();
+//            pstmt = connection.prepareStatement(CREATE_VIEW + PLAYLIST_RATING_VIEW + "as " +
+//                    "    SELECT sid, name, COUNT(pid) as playlistcount\n" +
+//                    "	 FROM " + PLAYLISTS_SONGS_VIEW +
+//                    "    WHERE " + PLAYLIST_SONG_COUNT_VIEW + ".");
+//            pstmt.execute();
             //TODO: check if DELETE ON CASCADE works
         } catch (SQLException var15) {
             System.out.println("error in createTables: " + var15);
@@ -182,6 +203,8 @@ public class Solution {
             pstmt.execute();
         } catch (SQLException e) {
             return sqlExceptionToReturnValue(e);
+        } catch (NullPointerException e) {
+            return ReturnValue.BAD_PARAMS;
         }
         finally {
             try {
@@ -222,6 +245,8 @@ public class Solution {
             res.close();
         } catch (SQLException e) {
             return User.badUser();
+        } catch (NullPointerException e) {
+            return User.badUser();
         }
         finally {
             try {
@@ -252,6 +277,8 @@ public class Solution {
             }
         } catch (SQLException e) {
             return sqlExceptionToReturnValue(e);
+        } catch (NullPointerException e) {
+            return ReturnValue.BAD_PARAMS;
         }
         finally {
             try {
@@ -279,12 +306,18 @@ public class Solution {
                             "WHERE id=(?)");
             pstmt.setBoolean(1, true);
             pstmt.setInt(2, userId);
+            User user = getUserProfile(userId);
+            if (user.getPremium() && !user.equals(User.badUser())) {
+                return ReturnValue.ALREADY_EXISTS;
+            }
             int count = pstmt.executeUpdate();
             if (count == 0) {
                 return ReturnValue.NOT_EXISTS;
             }
         } catch (SQLException e) {
             return sqlExceptionToReturnValue(e);
+        } catch (NullPointerException e) {
+            return ReturnValue.BAD_PARAMS;
         }
         finally {
             try {
@@ -303,10 +336,6 @@ public class Solution {
 
     public static ReturnValue updateUserNotPremium(Integer userId)
     {
-        User user = getUserProfile(userId);
-        if (!user.equals(User.badUser()) && !user.getPremium()) {
-            return ReturnValue.ALREADY_EXISTS; //TODO: CHECK IF CORRECT!! MAYBE NEED TO USE QUERY
-        }
         Connection connection = DBConnector.getConnection();
         PreparedStatement pstmt = null;
         try {
@@ -316,12 +345,18 @@ public class Solution {
                             "WHERE id=?");
             pstmt.setBoolean(1, false);
             pstmt.setInt(2, userId);
+            User user = getUserProfile(userId);
+            if (!user.getPremium() && !user.equals(User.badUser())) {
+                return ReturnValue.ALREADY_EXISTS;
+            }
             int count = pstmt.executeUpdate();
             if (count == 0) {
                 return ReturnValue.NOT_EXISTS;
             }
         } catch (SQLException e) {
             return sqlExceptionToReturnValue(e);
+        } catch (NullPointerException e) {
+            return ReturnValue.BAD_PARAMS;
         }
         finally {
             try {
@@ -396,6 +431,8 @@ public class Solution {
 
             res.close();
         } catch (SQLException e) {
+            return Song.badSong();
+        } catch (NullPointerException e) {
             return Song.badSong();
         }
         finally {
@@ -508,9 +545,6 @@ public class Solution {
 
     public static Playlist getPlaylist(Integer playlistId)
     {
-//        if (playlistId == null) {
-//            return Playlist.badPlaylist(); //TODO: IS THIS REQUIRED?
-//        }
         Playlist playlist = new Playlist();
         Connection connection = DBConnector.getConnection();
         PreparedStatement pstmt = null;
@@ -616,11 +650,16 @@ public class Solution {
     {
         Connection connection = DBConnector.getConnection();
         PreparedStatement pstmt = null;
+        Song song = getSong(songid);
+        Playlist playlist = getPlaylist(playlistId);
+        if (song.getGenre() == null || !song.getGenre().equals(playlist.getGenre())) {
+            return ReturnValue.BAD_PARAMS; //TODO: check if allowed
+        }
         try {
             pstmt = connection.prepareStatement("INSERT INTO " + INCLUDES_TABLE_NAME +
                     " VALUES (?, ?)");
-            pstmt.setInt(1,songid);
-            pstmt.setInt(2,playlistId);
+            pstmt.setInt(1,playlistId);
+            pstmt.setInt(2,songid);
 
 
             pstmt.execute();
@@ -802,8 +841,42 @@ public class Solution {
         return ReturnValue.OK;
     }
 
-    public static Integer getPlaylistTotalPlayCount(Integer playlistId){
-        return null;
+    public static Integer getPlaylistTotalPlayCount(Integer playlistId)
+    {
+        int count = 0;
+        Connection connection = DBConnector.getConnection();
+        PreparedStatement pstmt = null;
+        try {
+            pstmt = connection.prepareStatement("SELECT SUM(playcount) " +
+                    "FROM " + PLAYLISTS_SONGS_VIEW +
+                    "WHERE pid=?");
+            pstmt.setInt(1, playlistId);
+
+            ResultSet res = pstmt.executeQuery();
+
+            if (res.next()) {
+                count = res.getInt(1);
+            }
+
+            res.close();
+        } catch (SQLException e) {
+            return 0;
+        } catch (NullPointerException e) {
+            return 0;
+        }
+        finally {
+            try {
+                pstmt.close();
+            } catch (SQLException e) {
+                return 0;
+            }
+            try {
+                connection.close();
+            } catch (SQLException e) {
+                return 0;
+            }
+        }
+        return count;
     }
 
     public static Integer getPlaylistFollowersCount(Integer playlistId)
@@ -843,11 +916,81 @@ public class Solution {
     }
 
     public static String getMostPopularSong(){
-        return null;
+        Connection connection = DBConnector.getConnection();
+        PreparedStatement pstmt = null;
+        String name = null;
+        try {
+            pstmt = connection.prepareStatement(SELECT + "name, sid, COUNT(pid) as playlistcount " +
+                    "FROM " + PLAYLISTS_SONGS_VIEW +
+                    "GROUP BY sid, name" +
+                    "ORDER BY playlistcount DESC, sid DESC " +
+                    "LIMIT 1");
+
+            ResultSet res = pstmt.executeQuery();
+
+            if (getIncludesCount() == 0) {
+                name = NO_SONGS;
+            } else if (res.next()) {
+                name = res.getString(1);
+            }
+
+            res.close();
+        } catch (SQLException e) {
+            name =  null;
+        } catch (NullPointerException e) {
+            name =  null;
+        }
+        finally {
+            try {
+                pstmt.close();
+            } catch (SQLException e) {
+                name =  null;
+            }
+            try {
+                connection.close();
+            } catch (SQLException e) {
+                name =  null;
+            }
+        }
+        return name;
     }
 
     public static Integer getMostPopularPlaylist(){
-        return null;
+        Connection connection = DBConnector.getConnection();
+        PreparedStatement pstmt = null;
+        Integer pid = 0;
+        try {
+            pstmt = connection.prepareStatement(SELECT + "pid, SUM(playcount) as playcount " +
+                    "FROM " + PLAYLISTS_SONGS_VIEW +
+                    "GROUP BY pid " +
+                    "ORDER BY playcount DESC, pid DESC " +
+                    "LIMIT 1");
+
+            ResultSet res = pstmt.executeQuery();
+
+            if (res.next()) {
+                pid = res.getInt(1);
+            }
+
+            res.close();
+        } catch (SQLException e) {
+            pid =  0;
+        } catch (NullPointerException e) {
+            pid =  0;
+        }
+        finally {
+            try {
+                pstmt.close();
+            } catch (SQLException e) {
+                pid =  0;
+            }
+            try {
+                connection.close();
+            } catch (SQLException e) {
+                pid =  0;
+            }
+        }
+        return pid;
     }
 
     public static ArrayList<Integer> hottestPlaylistsOnTechnify(){
@@ -929,5 +1072,37 @@ public class Solution {
         return e.getSQLState().equals(errorString);
     }
 
+    private static Integer getIncludesCount() {
+        Integer count = 0;
+        Connection connection = DBConnector.getConnection();
+        PreparedStatement pstmt = null;
+        try {
+            pstmt = connection.prepareStatement("SELECT COUNT(*)" +
+                    "FROM " + INCLUDES_TABLE_NAME);
+
+            ResultSet res = pstmt.executeQuery();
+
+            if (res.next()) {
+                count = res.getInt(1);
+            }
+
+            res.close();
+        } catch (SQLException e) {
+            return 0;
+        }
+        finally {
+            try {
+                pstmt.close();
+            } catch (SQLException e) {
+                return 0;
+            }
+            try {
+                connection.close();
+            } catch (SQLException e) {
+                return 0;
+            }
+        }
+        return count;
+    }
 }
 
