@@ -1138,7 +1138,7 @@ public class InfoshocTest extends AbstractTest { //CREATE USER FUNCTION ISSUES
         // TODO: Test limit
     }
 
-    @Test
+    @Test //DONE
     public void getSongsRecommendationByGenreTest() {
         User user1 = createUser(1, "Noodles", "USA", false);
         User user2 = createUser(2, "Noodles", "USA", true);
@@ -1172,8 +1172,6 @@ public class InfoshocTest extends AbstractTest { //CREATE USER FUNCTION ISSUES
         assertOK(Solution.addPlaylist(playlist2));
         assertOK(Solution.addUser(user1));
         assertOK(Solution.addUser(user2));
-
-        assertOK(Solution.addSongToPlaylist(song1.getId(), playlist1.getId()));
 
         assertOK(Solution.songPlay(5, 5));
         assertOK(Solution.songPlay(2, 5));

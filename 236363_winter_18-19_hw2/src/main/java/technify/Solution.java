@@ -1206,7 +1206,7 @@ public class Solution {
             pstmt = connection.prepareStatement(
                     SELECT + "sid\n" +
                     "FROM " + PLAYLISTS_SONGS_VIEW + "\n" +
-                    "WHERE pid not in (SELECT pid FROM " + FOLLOWS_TABLE_NAME + " WHERE uid<>?) AND " +
+                    "WHERE (pid IS NULL OR pid NOT IN (SELECT pid FROM " + FOLLOWS_TABLE_NAME + " WHERE uid=?)) AND " +
                         "genre=?\n" +
                     "ORDER BY playcount DESC, sid ASC\n" +
                     "LIMIT 5");
