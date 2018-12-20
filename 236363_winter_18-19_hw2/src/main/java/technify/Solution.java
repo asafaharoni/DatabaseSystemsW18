@@ -24,7 +24,6 @@ public class Solution {
     private static final String FOLLOWS_TABLE_NAME = "Follows ";
     private static final String PLAYLISTS_SONGS_VIEW = "PlaylistsSongs ";
 //    private static final String PLAYLISTS_SONGS_VIEW = "PlaylistsUsers ";
-    private static final String PLAYLIST_PLAY_COUNT_VIEW = "PlaylistPlayCount ";
     private static final String PLAYLIST_RATING_VIEW = "PlaylistRating ";
     // COMMANDS
     private static final String CREATE_TABLE = "CREATE TABLE ";
@@ -99,11 +98,12 @@ public class Solution {
                             "on playlistssongs.pid = " + PLAYLISTS_TABLE_NAME + ".id"
                         );
             pstmt.execute();
-//            pstmt = connection.prepareStatement(CREATE_VIEW + PLAYLIST_RATING_VIEW + "as " +
-//                    "    SELECT sid, name, COUNT(pid) as playlistcount\n" +
-//                    "	 FROM " + PLAYLISTS_SONGS_VIEW +
-//                    "    WHERE " + PLAYLIST_SONG_COUNT_VIEW + ".");
-//            pstmt.execute();
+            pstmt = connection.prepareStatement(CREATE_VIEW + PLAYLIST_RATING_VIEW + "as " +
+                    "    SELECT pid, songcount, playcount, COALESCE(playcount/NULLIF(songcount, 0), 0) as rating FROM ( \n" +
+                    "       SELECT pid, COUNT(sid) as songcount, SUM(playcount) as playcount\n" +
+                    "       FROM PlaylistsSongs \n" +
+                    "       GROUP BY pid\n) AS counters");
+            pstmt.execute();
             //TODO: check if DELETE ON CASCADE works
         } catch (SQLException var15) {
             System.out.println("error in createTables: " + var15);
@@ -847,8 +847,8 @@ public class Solution {
         Connection connection = DBConnector.getConnection();
         PreparedStatement pstmt = null;
         try {
-            pstmt = connection.prepareStatement("SELECT SUM(playcount) " +
-                    "FROM " + PLAYLISTS_SONGS_VIEW +
+            pstmt = connection.prepareStatement("SELECT playcount " +
+                    "FROM " + PLAYLIST_RATING_VIEW +
                     "WHERE pid=?");
             pstmt.setInt(1, playlistId);
 
@@ -994,7 +994,39 @@ public class Solution {
     }
 
     public static ArrayList<Integer> hottestPlaylistsOnTechnify(){
-        return null;
+        ArrayList<Integer> arr = new ArrayList<>();
+        Connection connection = DBConnector.getConnection();
+        PreparedStatement pstmt = null;
+        try {
+            pstmt = connection.prepareStatement(SELECT + "pid FROM " + PLAYLIST_RATING_VIEW +
+                    "WHERE playcount > 0 " +
+                    "ORDER BY rating DESC, pid ASC " +
+                    "LIMIT 10");
+
+            ResultSet res = pstmt.executeQuery();
+
+            while (res.next()) {
+                int s = res.getInt(1);
+                arr.add(s);
+            }
+
+            res.close();
+        } catch (SQLException e) {
+            return arr;
+        }
+        finally {
+            try {
+                pstmt.close();
+            } catch (SQLException e) {
+                return arr;
+            }
+            try {
+                connection.close();
+            } catch (SQLException e) {
+                return arr;
+            }
+        }
+        return arr;
     }
 
     public static ArrayList<Integer> getSimilarUsers(Integer userId)
@@ -1045,7 +1077,53 @@ public class Solution {
     }
 
     public static ArrayList<Integer> getTopCountryPlaylists(Integer userId) {
-        return null;
+        ArrayList<Integer> arr = new ArrayList<>();
+        Connection connection = DBConnector.getConnection();
+        PreparedStatement pstmt = null;
+        User user = getUserProfile(userId);
+        if (user.equals(User.badUser()) || !user.getPremium()) {
+            return arr;
+        }
+        try {
+            pstmt = connection.prepareStatement(SELECT + "pid\nFROM (\n" +
+                    "   SELECT L1.pid, SUM(playcount) as playcount\n" +
+                    "   FROM " + PLAYLIST_RATING_VIEW + "L1 RIGHT JOIN (\n" +
+                    "           SELECT pid\n" +
+                    "           FROM " + PLAYLISTS_SONGS_VIEW + "\n" +
+                    "           WHERE country=?\n" +
+                    "       ) AS L2 \n" +
+                    "   ON L1.pid = L2.pid\n" +
+                    "   WHERE L1.pid = L2.pid\n" +
+                    "   GROUP BY L1.pid \n" +
+                    ") AS L3\n" +
+                    "ORDER BY playcount DESC, pid ASC \n" +
+                    "LIMIT 10");
+            pstmt.setString(1, user.getCountry());
+
+            ResultSet res = pstmt.executeQuery();
+
+            while (res.next()) {
+                int s = res.getInt(1);
+                arr.add(s);
+            }
+
+            res.close();
+        } catch (SQLException e) {
+            return arr;
+        }
+        finally {
+            try {
+                pstmt.close();
+            } catch (SQLException e) {
+                return arr;
+            }
+            try {
+                connection.close();
+            } catch (SQLException e) {
+                return arr;
+            }
+        }
+        return arr;
     }
 
     public static ArrayList<Integer> getPlaylistRecommendation (Integer userId){
